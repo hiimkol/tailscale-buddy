@@ -1,0 +1,52 @@
+name: Deploy to Pi 5
+
+on:
+  push:
+    branches: [ "main", "master" ]
+  workflow_dispatch:
+
+env:
+  # If you want to use GHCR still for backup/versioning:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+  CONTAINER_NAME: tailscale-buddy
+
+jobs:
+  deploy:
+    runs-on: self-hosted
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # Optional: Login to GHCR if we want to push the image there too
+      - name: Log in to the Container registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build Docker Image
+        run: docker build -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest .
+
+      - name: Push Docker Image (Optional Backup)
+        run: docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+
+      - name: Stop Previous Container
+        run: docker stop ${{ env.CONTAINER_NAME }} || true
+
+      - name: Remove Previous Container
+        run: docker rm ${{ env.CONTAINER_NAME }} || true
+
+      - name: Run New Container
+        run: |
+          docker run -d \
+            --name ${{ env.CONTAINER_NAME }} \
+            --restart unless-stopped \
+            -p 3000:3000 \
+            -v $HOME/app_data/tailscale-buddy:/app/data \
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
