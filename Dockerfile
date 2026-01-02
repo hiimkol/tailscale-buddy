@@ -1,8 +1,9 @@
-FROM node:20-alpine AS base
+FROM node:20-slim AS base
 
 # Install dependencies only when needed
 FROM base AS deps
-RUN apk add --no-cache libc6-compat
+# Debian/Slim uses glibc, so libc6-compat is not needed.
+# We might need openssl depending on prisma/etc (not used here yet).
 WORKDIR /app
 
 # Install dependencies based on the preferred package manager
