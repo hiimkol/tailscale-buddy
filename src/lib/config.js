@@ -28,15 +28,10 @@ export async function getConfig() {
     await ensureDataDir();
     const data = await fs.readFile(CONFIG_PATH, 'utf-8');
     const jsonConfig = JSON.parse(data);
-    return { ...jsonConfig, ...envConfig }; // Env overrides json? Or vice versa? Usually Env is stronger.
-    // However, if user sets via UI, we want that to persist. 
-    // Let's say JSON is the dynamic store.
-    // If Env is set, use it. If not, use JSON.
-    
     // Merge strategy: Use Env if present, else JSON.
     const merged = {};
     for (const key in envConfig) {
-        merged[key] = envConfig[key] || jsonConfig[key];
+      merged[key] = envConfig[key] || jsonConfig[key];
     }
     return merged;
   } catch (error) {
@@ -56,7 +51,7 @@ export async function saveConfig(newConfig) {
   try {
     const data = await fs.readFile(CONFIG_PATH, 'utf-8');
     existing = JSON.parse(data);
-  } catch {}
+  } catch { }
 
   const final = { ...existing, ...newConfig };
   await fs.writeFile(CONFIG_PATH, JSON.stringify(final, null, 2), 'utf-8');
