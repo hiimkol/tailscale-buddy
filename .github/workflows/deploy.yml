@@ -12,7 +12,7 @@ env:
 
 jobs:
   build:
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
@@ -27,6 +27,9 @@ jobs:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -44,8 +47,8 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
+          platforms: linux/arm64
           push: true
-          # Native build on Pi (default arch is linux/arm64)
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
@@ -53,33 +56,26 @@ jobs:
 
   deploy:
     needs: build
-    runs-on: self-hosted
-    permissions:
-      contents: read
-      packages: read
+    runs-on: ubuntu-latest
     
     steps:
-      - name: Log in to the Container registry
-        uses: docker/login-action@v3
+      - name: Deploy to Pi via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Pull Docker Image
-        run: docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
-
-      - name: Stop Previous Container
-        run: docker stop ${{ env.CONTAINER_NAME }} || true
-
-      - name: Remove Previous Container
-        run: docker rm ${{ env.CONTAINER_NAME }} || true
-
-      - name: Run New Container
-        run: |
-          docker run -d \
-            --name ${{ env.CONTAINER_NAME }} \
-            --restart unless-stopped \
-            -p 3000:3000 \
-            -v $HOME/app_data/tailscale-buddy:/app/data \
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USERNAME }}
+          key: ${{ secrets.SSH_KEY }}
+          envs: GITHUB_TOKEN,REGISTRY,IMAGE_NAME,CONTAINER_NAME
+          script: |
+            echo $GITHUB_TOKEN | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+            docker pull ghcr.io/${{ env.IMAGE_NAME }}:latest
+            docker stop ${{ env.CONTAINER_NAME }} || true
+            docker rm ${{ env.CONTAINER_NAME }} || true
+            docker run -d \
+              --name ${{ env.CONTAINER_NAME }} \
+              --restart unless-stopped \
+              -p 3000:3000 \
+              -v $HOME/app_data/tailscale-buddy:/app/data \
+              ghcr.io/${{ env.IMAGE_NAME }}:latest
