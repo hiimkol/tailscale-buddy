@@ -67,22 +67,31 @@ jobs:
           tags: tag:ci
 
       - name: Deploy to Pi via SSH
-        uses: appleboy/ssh-action@v1.0.3
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USERNAME }}
-          key: ${{ secrets.SSH_KEY }}
-          envs: GITHUB_TOKEN,REGISTRY,IMAGE_NAME,CONTAINER_NAME
-          script: |
-            echo $GITHUB_TOKEN | docker login ghcr.io -u ${{ github.actor }} --password-stdin
-            docker pull ghcr.io/${{ env.IMAGE_NAME }}:latest
-            docker stop ${{ env.CONTAINER_NAME }} || true
-            docker rm ${{ env.CONTAINER_NAME }} || true
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USERNAME }}
+          SSH_KEY: ${{ secrets.SSH_KEY }}
+          REGISTRY: ${{ env.REGISTRY }}
+          IMAGE_NAME: ${{ env.IMAGE_NAME }}
+          CONTAINER_NAME: ${{ env.CONTAINER_NAME }}
+        run: |
+          mkdir -p ~/.ssh/
+          echo "$SSH_KEY" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          
+          # Add the server to known hosts to avoid interactive prompt
+          ssh-keyscan -H "$SSH_HOST" >> ~/.ssh/known_hosts 2>/dev/null || true
+          
+          # Run deployment commands 
+          ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa "$SSH_USER@$SSH_HOST" <<EOF
+            echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+            docker pull ghcr.io/$IMAGE_NAME:latest
+            docker stop $CONTAINER_NAME || true
+            docker rm $CONTAINER_NAME || true
             docker run -d \
-              --name ${{ env.CONTAINER_NAME }} \
+              --name $CONTAINER_NAME \
               --restart unless-stopped \
               -p 3000:3000 \
-              -v $HOME/app_data/tailscale-buddy:/app/data \
-              ghcr.io/${{ env.IMAGE_NAME }}:latest
+              -v \$HOME/app_data/tailscale-buddy:/app/data \
+              ghcr.io/$IMAGE_NAME:latest
+          EOF
