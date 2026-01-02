@@ -91,7 +91,7 @@ jobs:
             docker run -d \
               --name $CONTAINER_NAME \
               --restart unless-stopped \
-              -p 3000:3000 \
+              -p 3001:3000 \
               -v \$HOME/app_data/tailscale-buddy:/app/data \
               ghcr.io/$IMAGE_NAME:latest
           EOF
