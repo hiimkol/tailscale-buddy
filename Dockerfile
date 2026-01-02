@@ -7,8 +7,10 @@ FROM base AS deps
 WORKDIR /app
 
 # Install dependencies based on the preferred package manager
-COPY package.json package-lock.json* ./
-RUN rm -f package-lock.json && npm install
+COPY package.json package-lock.json ./
+RUN \
+    --mount=type=cache,target=/root/.npm \
+    npm ci
 
 # Rebuild the source code only when needed
 FROM base AS builder
