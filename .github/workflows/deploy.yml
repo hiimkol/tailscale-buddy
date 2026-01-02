@@ -84,6 +84,10 @@ jobs:
           
           # Run deployment commands 
           ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa "$SSH_USER@$SSH_HOST" <<EOF
+            # Prepare data directory with correct permissions
+            mkdir -p \$HOME/app_data/tailscale-buddy
+            chmod 777 \$HOME/app_data/tailscale-buddy
+
             echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
             docker pull ghcr.io/$IMAGE_NAME:latest
             docker stop $CONTAINER_NAME || true
